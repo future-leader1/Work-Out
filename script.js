@@ -1,16 +1,5 @@
 'use strict';
 
-// prettier-ignore
-const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-
-const form = document.querySelector('.form');
-const containerWorkouts = document.querySelector('.workouts');
-const inputType = document.querySelector('.form__input--type');
-const inputDistance = document.querySelector('.form__input--distance');
-const inputDuration = document.querySelector('.form__input--duration');
-const inputCadence = document.querySelector('.form__input--cadence');
-const inputElevation = document.querySelector('.form__input--elevation');
-
 //planning step
 ///user storeies is the descroiption of the application by user perspective
 /// user stories will be devided into features
@@ -27,13 +16,24 @@ class Workout {
     this.distance = distance;
     this.duration = duration;
   }
+
+  _setDesciption() {
+    // prettier-ignore
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+    this.desciption = `${this.type[0].toUpperCase()}${this.type.slice(1)} on ${
+      months[this.date.getMonth()]
+    } ${this.date.getDay()}`;
+  }
 }
 
 class Running extends Workout {
+  type = 'running';
   constructor(coords, distance, duration, cadence) {
     super(coords, distance, duration);
     this.cadence = cadence;
     this.calcPace();
+    this._setDesciption();
   }
 
   calcPace() {
@@ -43,10 +43,12 @@ class Running extends Workout {
 }
 
 class Cycleing extends Workout {
+  type = 'cycling';
   constructor(coords, distance, duration, elevationGain) {
     super(coords, distance, duration);
     this.elevationGain = this.elevationGain;
     this.clacSpeed();
+    this._setDesciption();
   }
   clacSpeed() {
     this.speed = this.distance / (this.duration / 60);
@@ -56,17 +58,28 @@ class Cycleing extends Workout {
 const run = new Running([37, -127], 3, 24, 123);
 const cylce = new Cycleing([37, -127], 27, 95, 523);
 
-console.log(run, cylce);
-
 ////aplication architecture
+
+const form = document.querySelector('.form');
+const containerWorkouts = document.querySelector('.workouts');
+const inputType = document.querySelector('.form__input--type');
+const inputDistance = document.querySelector('.form__input--distance');
+const inputDuration = document.querySelector('.form__input--duration');
+const inputCadence = document.querySelector('.form__input--cadence');
+const inputElevation = document.querySelector('.form__input--elevation');
 
 class App {
   #map;
+  #mapZoomLevel = 13;
   #mapEvent;
+  #workout = [];
+
   constructor() {
     this._getPosition();
     form.addEventListener('submit', this._newWorkout.bind(this));
     inputType.addEventListener('change', this._toggleElevationField);
+
+    containerWorkouts.addEventListener('click', this._moveToPopup.bind(this));
   }
 
   _getPosition() {
@@ -85,8 +98,6 @@ class App {
   _loadMap(position) {
     const { latitude } = position.coords;
     const { longitude } = position.coords;
-    console.log(`https://www.google.com/maps/@${latitude},${longitude}`);
-    console.log(latitude, longitude);
 
     const coords = [latitude, longitude];
 
@@ -108,22 +119,81 @@ class App {
     inputDistance.focus();
   }
 
+  _hideForm() {
+    inputDistance.value =
+      inputDuration.value =
+      inputCadence.value =
+      inputElevation.value =
+        ' ';
+    form.style.display = 'none';
+    form.classList.add('hidden');
+    setTimeout(() => (form.style.display = 'grid'), 1000);
+  }
+
   _toggleElevationField() {
     inputElevation.closest('.form__row').classList.toggle('form__row--hidden');
     inputCadence.closest('.form__row').classList.toggle('form__row--hidden');
   }
   _newWorkout(e) {
     e.preventDefault();
-    ///clear input fields
-    inputDistance.value =
-      inputDuration.value =
-      inputCadence.value =
-      inputElevation.value =
-        ' ';
-    //console.log(mapEvent.latlng);
+
+    const validInputs = (...input) => input.every(e => Number.isFinite(e));
+    const allPosotive = (...input) => input.every(e => e > 0);
+    // get th form from the input
+
+    const type = inputType.value;
+    const distance = +inputDistance.value;
+    const duration = +inputDuration.value;
     const { lat, lng } = this.#mapEvent.latlng;
-    console.log(this.#mapEvent.latlng);
-    L.marker([lat, lng])
+    let workout;
+
+    // if workout running , create running object
+    if (type === 'running') {
+      const cadence = +inputCadence.value;
+      //check if the data is valid
+      if (
+        !validInputs(distance, duration, cadence) ||
+        !allPosotive(distance, duration, cadence)
+      )
+        return alert('Input Error');
+
+      workout = new Running([lat, lng], distance, duration, cadence);
+      this.#workout.push(workout);
+      console.log('running', workout);
+    }
+
+    // if workout cycling, create cycling object
+    if (type === 'cycling') {
+      const elevation = +inputElevation.value;
+      //check if the data is valid
+      if (
+        !validInputs(distance, duration, elevation) ||
+        !allPosotive(distance, duration)
+      )
+        return alert('Input Error');
+
+      //add new object to workout array
+      workout = new Cycleing([lat, lng], distance, duration, elevation);
+      this.#workout.push(workout);
+      console.log('cycleing', workout);
+    }
+
+    //render workout on list
+    this._rednerWorkoutMarker(workout);
+
+    this._renderWorkout(workout);
+
+    ///clear input fields
+
+    this._hideForm(workout);
+
+    //console.log(mapEvent.latlng);
+  }
+
+  _rednerWorkoutMarker(workout) {
+    //render workout on map as marker
+
+    L.marker(workout.coords)
       .addTo(this.#map)
       .bindPopup(
         L.popup({
@@ -131,11 +201,76 @@ class App {
           minWidth: 100,
           autoClose: false,
           closeOnClick: false,
-          className: 'running-popup',
+          className: `${workout.type}-popup`,
         })
       )
-      .setPopupContent('Workout')
+      .setPopupContent(
+        `${workout.type === 'running' ? '🏃‍♂️' : ' 🚴‍♀️'}` + workout.desciption
+      )
       .openPopup();
+  }
+
+  _renderWorkout(workout) {
+    let html = `
+    <li class="workout workout--${workout.name}" data-id="${workout.id}">
+    <h2 class="workout__title">${workout.desciption}</h2>
+    <div class="workout__details">
+      <span class="workout__icon">${
+        workout.type === 'running' ? '🏃‍♂️' : ' 🚴‍♀️'
+      }</span>
+      <span class="workout__value">${workout.distance}</span>
+      <span class="workout__unit">km</span>
+    </div>
+    <div class="workout__details">
+      <span class="workout__icon">⏱</span>
+      <span class="workout__value">${workout.duration}</span>
+      <span class="workout__unit">min</span>
+    </div>`;
+
+    if (workout.type === 'running')
+      html += `
+      <div class="workout__details">
+      <span class="workout__icon">⚡️</span>
+      <span class="workout__value">${workout.pace.toFixed(1)}</span>
+      <span class="workout__unit">min/km</span>
+       </div>
+       <div class="workout__details">
+      <span class="workout__icon">🦶🏼</span>
+      <span class="workout__value">${workout.cadence}</span>
+      <span class="workout__unit">spm</span>
+      </div>
+      </li>`;
+
+    if (workout.type === 'cycling')
+      html += `<div class="workout__details">
+      <span class="workout__icon">⚡️</span>
+      <span class="workout__value">${workout.speed.toFixed(1)}</span>
+      <span class="workout__unit">km/h</span>
+      </div>
+      <div class="workout__details">
+      <span class="workout__icon">⛰</span>
+      <span class="workout__value">${workout.elevationGain}</span>
+      <span class="workout__unit">m</span>
+      </div>
+      </li>`;
+
+    form.insertAdjacentHTML('afterend', html);
+  }
+
+  _moveToPopup(e) {
+    const workoutEl = e.target.closest('.workout');
+    console.log(workoutEl);
+    if (!workoutEl) return;
+
+    const workout = this.#workout.find(el => el.id === workoutEl.dataset.id);
+    console.log(workout);
+
+    this.#map.setView(workout.coords, this.#mapZoomLevel, {
+      animate: true,
+      pan: {
+        duration: 1,
+      },
+    });
   }
 }
 
