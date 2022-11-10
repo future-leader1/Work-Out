@@ -218,3 +218,8 @@ a:visited {
 .cycling-popup .leaflet-popup-content-wrapper {
   border-left: 5px solid var(--color-brand--1);
 }
+
+.form__reset {
+  font-size: 2ch;
+  color: #00c46a;
+}
