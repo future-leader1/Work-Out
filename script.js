@@ -46,7 +46,7 @@ class Cycleing extends Workout {
   type = 'cycling';
   constructor(coords, distance, duration, elevationGain) {
     super(coords, distance, duration);
-    this.elevationGain = this.elevationGain;
+    this.elevationGain = elevationGain;
     this.clacSpeed();
     this._setDesciption();
   }
@@ -55,8 +55,8 @@ class Cycleing extends Workout {
   }
 }
 
-const run = new Running([37, -127], 3, 24, 123);
-const cylce = new Cycleing([37, -127], 27, 95, 523);
+// const run = new Running([37, -127], 3, 24, 123);
+// const cylce = new Cycleing([37, -127], 27, 95, 523);
 
 ////aplication architecture
 
@@ -68,6 +68,7 @@ const inputDuration = document.querySelector('.form__input--duration');
 const inputCadence = document.querySelector('.form__input--cadence');
 const inputElevation = document.querySelector('.form__input--elevation');
 const btnReset = document.querySelector('.form__reset');
+const btnShowAllWorkouts = document.querySelector('.form__all');
 
 class App {
   #map;
@@ -84,9 +85,11 @@ class App {
 
     ///attach event listner
     form.addEventListener('submit', this._newWorkout.bind(this));
+    this.sort();
     inputType.addEventListener('change', this._toggleElevationField);
     containerWorkouts.addEventListener('click', this._moveToPopup.bind(this));
     btnReset.addEventListener('click', this.reset);
+    btnShowAllWorkouts.addEventListener('click', this.showAll.bind(this));
   }
 
   _getPosition() {
@@ -124,6 +127,7 @@ class App {
 
   _showForm(mapE) {
     this.#mapEvent = mapE;
+    console.log(mapE);
     form.classList.remove('hidden');
     inputDistance.focus();
   }
@@ -136,6 +140,7 @@ class App {
         ' ';
     form.style.display = 'none';
     form.classList.add('hidden');
+    this.sort();
     setTimeout(() => (form.style.display = 'grid'), 1000);
   }
 
@@ -168,7 +173,7 @@ class App {
 
       workout = new Running([lat, lng], distance, duration, cadence);
       this.#workout.push(workout);
-      console.log('running', workout);
+      //console.log('running', workout);
     }
 
     // if workout cycling, create cycling object
@@ -183,8 +188,9 @@ class App {
 
       //add new object to workout array
       workout = new Cycleing([lat, lng], distance, duration, elevation);
+      console.log(workout);
       this.#workout.push(workout);
-      console.log('cycleing', workout);
+      //console.log('cycleing', workout);
     }
 
     //render workout on list
@@ -199,6 +205,8 @@ class App {
     //console.log(mapEvent.latlng);
 
     //set local storage
+
+    this.sort();
 
     this._setLocalStorage();
   }
@@ -226,8 +234,12 @@ class App {
   _renderWorkout(workout) {
     let html = `
     <li class="workout workout--${workout.name}" data-id="${workout.id}">
+    <button class="form_edit">Edit</button>
+    <button class="form_delete">Delete</button>
     <h2 class="workout__title">${workout.desciption}</h2>
+    
     <div class="workout__details">
+    
       <span class="workout__icon">${
         workout.type === 'running' ? '🏃‍♂️' : ' 🚴‍♀️'
       }</span>
@@ -272,11 +284,10 @@ class App {
 
   _moveToPopup(e) {
     const workoutEl = e.target.closest('.workout');
-    console.log(workoutEl);
+    //console.log(workoutEl);
     if (!workoutEl) return;
 
     const workout = this.#workout.find(el => el.id === workoutEl.dataset.id);
-    console.log(workout);
 
     this.#map.setView(workout.coords, this.#mapZoomLevel, {
       animate: true,
@@ -284,6 +295,13 @@ class App {
         duration: 1,
       },
     });
+    // if (e.target.classList.contains('form_edit')) {
+    //   workoutEl.style.display = 'none';
+    //   this.edit(workout);
+    // }
+    if (e.target.classList.contains('form_delete')) {
+      workoutEl.style.display = 'none';
+    }
   }
 
   _setLocalStorage() {
@@ -305,6 +323,31 @@ class App {
   reset() {
     localStorage.removeItem('workout');
     location.reload();
+  }
+
+  sort() {
+    this.#workout = this.#workout.slice().sort((a, b) => {
+      return a.distance - b.distance;
+    });
+  }
+  showAll() {
+    const s = this.#workout.map((e, i) => {
+      let sumL = 0;
+      let sumN = 0;
+      console.log(e.coords);
+
+      sumL += e[i].coords[i];
+      sumN += e[i].coords[i + 1];
+
+      return { lat: sumL, lng: sumN };
+    });
+    console.log('v', s);
+
+    const latlng = L.latLng(50.5, 30.5);
+    this.#map.setZoomAround(latlng, 13, {
+      animate: true,
+      pan: { duration: 3 },
+    });
   }
 }
 
